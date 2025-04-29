@@ -22,6 +22,7 @@ classifiers = [
 ]
 # Add runtime dependencies here if any are known upfront
 dependencies = [
+    "firecrawl-py>=2.4.3",
     "universal_mcp>=0.1.11",
 ]
 
