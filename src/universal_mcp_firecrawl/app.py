@@ -22,14 +22,13 @@ class FirecrawlApp(APIApplication):
         return FirecrawlApiClient(api_key=api_key)
 
     def scrape_url(
-        self, url: str, params: dict[str, Any] | None = None
+        self, url: str
     ) -> dict[str, Any] | str:
         """
         Scrapes a single URL using Firecrawl and returns the extracted data.
 
         Args:
             url: The URL of the web page to scrape.
-            params: Optional dictionary of parameters to customize the scrape.
 
         Returns:
             A dictionary containing the scraped data on success,
@@ -40,21 +39,20 @@ class FirecrawlApp(APIApplication):
         """
         try:
             client = self._get_client()
-            response_data = client.scrape_url(url=url, params=params)
+            response_data = client.scrape_url(url=url)
             return response_data
 
         except Exception as e:
             return f"Error scraping URL {url}: {type(e).__name__} - {e}"
 
     def search(
-        self, query: str, params: dict[str, Any] | None = None
+        self, query: str
     ) -> dict[str, Any] | str:
         """
         Performs a web search using Firecrawl's search capability.
 
         Args:
             query: The search query string.
-            params: Optional dictionary of search parameters.
 
         Returns:
             A dictionary containing the search results on success,
@@ -65,7 +63,7 @@ class FirecrawlApp(APIApplication):
         """
         try:
             client = self._get_client()
-            response = client.search(query=query, params=params)
+            response = client.search(query=query)
             return response
         except Exception as e:
             return f"Error performing search for '{query}': {type(e).__name__} - {e}"
@@ -73,16 +71,12 @@ class FirecrawlApp(APIApplication):
     def start_crawl(
         self,
         url: str,
-        params: dict[str, Any] | None = None,
-        idempotency_key: str | None = None,
     ) -> dict[str, Any] | str:
         """
         Starts a crawl job for a given URL using Firecrawl. Returns the job ID immediately.
 
         Args:
             url: The starting URL for the crawl.
-            params: Optional dictionary of parameters to customize the crawl.
-            idempotency_key: Optional unique key to prevent duplicate jobs.
 
         Returns:
             A dictionary containing the job initiation response on success,
@@ -94,7 +88,7 @@ class FirecrawlApp(APIApplication):
         try:
             client = self._get_client()
             response = client.async_crawl_url(
-                url=url, params=params, idempotency_key=idempotency_key
+                url=url
             )
             return response
 
@@ -149,16 +143,12 @@ class FirecrawlApp(APIApplication):
     def start_batch_scrape(
         self,
         urls: list[str],
-        params: dict[str, Any] | None = None,
-        idempotency_key: str | None = None,
     ) -> dict[str, Any] | str:
         """
         Starts a batch scrape job for multiple URLs using Firecrawl.
 
         Args:
             urls: A list of URLs to scrape.
-            params: Optional dictionary of parameters applied to all scrapes.
-            idempotency_key: Optional unique key to prevent duplicate jobs.
 
         Returns:
             A dictionary containing the job initiation response on success,
@@ -170,7 +160,7 @@ class FirecrawlApp(APIApplication):
         try:
             client = self._get_client()
             response = client.async_batch_scrape_urls(
-                urls=urls, params=params, idempotency_key=idempotency_key
+                urls=urls
             )
             return response
 
@@ -202,16 +192,12 @@ class FirecrawlApp(APIApplication):
     def start_extract(
         self,
         urls: list[str],
-        params: dict[str, Any] | None = None,
-        idempotency_key: str | None = None,
     ) -> dict[str, Any] | str:
         """
         Starts an extraction job for one or more URLs using Firecrawl.
 
         Args:
             urls: A list of URLs to extract data from.
-            params: Dictionary of parameters. MUST include 'prompt' or 'schema'.
-            idempotency_key: Optional unique key to prevent duplicate jobs.
 
         Returns:
             A dictionary containing the job initiation response on success,
@@ -224,7 +210,7 @@ class FirecrawlApp(APIApplication):
         try:
             client = self._get_client()
             response = client.async_extract(
-                urls=urls, params=params, idempotency_key=idempotency_key
+                urls=urls
             )
             return response
 
