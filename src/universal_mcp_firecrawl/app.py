@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Any, Optional, Type
 
 from loguru import logger
 
@@ -353,12 +353,20 @@ class FirecrawlApp(APIApplication):
     def start_extract(
         self,
         urls: list[str],
+        prompt: Optional[str] = None,
+        schema: Optional[Any] = None,
+        system_prompt: Optional[str] = None,
+        allow_external_links: Optional[bool] = False,
     ) -> dict[str, Any] | str:
         """
-        Starts an extraction job for one or more URLs using Firecrawl.
+        Starts an asynchronous extraction job for one or more URLs using Firecrawl.
 
         Args:
             urls: A list of URLs to extract data from.
+            prompt: Optional custom extraction prompt.
+            schema: Optional JSON schema or Pydantic model for the desired output structure.
+            system_prompt: Optional system context for the extraction.
+            allow_external_links: Optional boolean to allow following external links.
 
         Returns:
             A dictionary containing the job initiation response on success,
@@ -371,18 +379,28 @@ class FirecrawlApp(APIApplication):
         Tags:
             extract, ai, async_job, start
         """
-        logger.info(f"Attempting to start Firecrawl extraction for {len(urls)} URLs.")
+        logger.info(f"Attempting to start Firecrawl extraction for {len(urls)} URLs with prompt: {prompt is not None}, schema: {schema is not None}.")
         try:
             client = self._get_client()
-            response = client.async_extract(urls=urls)
-            logger.info(f"Successfully started Firecrawl extraction for {len(urls)} URLs.")
-            return response
+            response = client.async_extract(
+                urls=urls,
+                prompt=prompt,
+                schema=schema,
+                system_prompt=system_prompt,
+                allow_external_links=allow_external_links,
+            )
+            logger.info(f"Successfully started Firecrawl extraction for {len(urls)} URLs. Job ID: {response.job_id}")
+            return response.model_dump()
         except NotAuthorizedError:
+            logger.error("Firecrawl API key missing or invalid.")
             raise
         except ToolError:
+            logger.error("Firecrawl SDK not installed.")
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"starting extraction for {len(urls)} URLs")
+            error_message = self._handle_firecrawl_exception(e, f"starting extraction for {len(urls)} URLs")
+            logger.error(f"Failed to start Firecrawl extraction: {error_message}")
+            return error_message
 
     def check_extract_status(self, job_id: str) -> dict[str, Any] | str:
         """
@@ -415,13 +433,7 @@ class FirecrawlApp(APIApplication):
         except Exception as e:
             return self._handle_firecrawl_exception(e, f"checking extraction status for job ID {job_id}")
 
-    def list_tools(self) -> list[callable]:
-        """Returns a list of methods exposed as tools."""
-        # Ensure SDK availability for tools that depend on it
-        if FirecrawlApiClient is None:
-            logger.warning("Firecrawl SDK not available, Firecrawl tools will be limited or non-functional.")
-            return [] # Or return a limited set of tools if some don't require the SDK
-
+    def list_tools(self):
         return [
             self.scrape_url,
             self.search,
