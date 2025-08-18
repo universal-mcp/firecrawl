@@ -360,6 +360,7 @@ class FirecrawlApp(APIApplication):
     ) -> dict[str, Any] | str:
         """
         Starts an asynchronous extraction job for one or more URLs using Firecrawl.
+        Returns a job ID immediately that can be used to check status later.
 
         Args:
             urls: A list of URLs to extract data from.
@@ -369,7 +370,7 @@ class FirecrawlApp(APIApplication):
             allow_external_links: Optional boolean to allow following external links.
 
         Returns:
-            A dictionary containing the job initiation response on success,
+            A dictionary containing the job initiation response with job ID on success,
             or a string containing an error message on failure.
 
         Raises:
@@ -401,6 +402,60 @@ class FirecrawlApp(APIApplication):
             error_message = self._handle_firecrawl_exception(e, f"starting extraction for {len(urls)} URLs")
             logger.error(f"Failed to start Firecrawl extraction: {error_message}")
             return error_message
+
+    def quick_web_extract(
+        self,
+        urls: list[str],
+        prompt: Optional[str] = None,
+        schema: Optional[Any] = None,
+        system_prompt: Optional[str] = None,
+        allow_external_links: Optional[bool] = False,
+    ) -> dict[str, Any]:
+        """
+        Performs a quick, synchronous extraction of data from one or more URLs using Firecrawl and returns the results directly.
+
+        Args:
+            urls: A list of URLs to extract data from.
+            prompt: Optional custom extraction prompt describing what data to extract.
+            schema: Optional JSON schema or Pydantic model for the desired output structure.
+            system_prompt: Optional system context for the extraction.
+            allow_external_links: Optional boolean to allow following external links.
+
+        Returns:
+            A dictionary containing the extracted data on success.
+
+        Raises:
+            NotAuthorizedError: If API key is missing or invalid.
+            ToolError: If the Firecrawl SDK is not installed or extraction fails.
+
+        Tags:
+            extract, ai, sync, quick, important
+        """
+        logger.info(f"Attempting quick web extraction for {len(urls)} URLs with prompt: {prompt is not None}, schema: {schema is not None}.")
+        try:
+            client = self._get_client()
+            response = client.extract(
+                urls=urls,
+                prompt=prompt,
+                schema=schema,
+                system_prompt=system_prompt,
+                allow_external_links=allow_external_links,
+            )
+            logger.info(f"Successfully completed quick web extraction for {len(urls)} URLs.")
+            return response
+        except NotAuthorizedError:
+            logger.error("Firecrawl API key missing or invalid.")
+            raise
+        except ToolError:
+            logger.error("Firecrawl SDK not installed.")
+            raise
+        except Exception as e:
+            error_message = self._handle_firecrawl_exception(e, f"quick web extraction for {len(urls)} URLs")
+            logger.error(f"Failed to perform quick web extraction: {error_message}")
+            if error_message:
+                raise ToolError(error_message)
+            else:
+                raise ToolError(f"Quick web extraction failed for {len(urls)} URLs: {e}")
 
     def check_extract_status(self, job_id: str) -> dict[str, Any] | str:
         """
@@ -442,6 +497,7 @@ class FirecrawlApp(APIApplication):
             self.cancel_crawl,
             self.start_batch_scrape, 
             self.check_batch_scrape_status, 
+            self.quick_web_extract,
             self.start_extract, 
             self.check_extract_status, 
         ]
