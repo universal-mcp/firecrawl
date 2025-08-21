@@ -17,5 +17,4 @@ This is automatically generated from OpenAPI schema for the FirecrawlApp API.
 | `start_batch_scrape` | Starts a batch scrape job for multiple URLs using Firecrawl. (Note: May map to multiple individual scrapes or a specific batch API endpoint if available) |
 | `check_batch_scrape_status` | Checks the status of a previously initiated Firecrawl batch scrape job. |
 | `quick_web_extract` | Performs a quick, synchronous extraction of data from one or more URLs using Firecrawl and returns the results directly. |
-| `start_extract` | Starts an asynchronous extraction job for one or more URLs using Firecrawl. |
 | `check_extract_status` | Checks the status of a previously initiated Firecrawl extraction job. |
