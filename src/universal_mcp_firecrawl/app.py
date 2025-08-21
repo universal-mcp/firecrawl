@@ -3,10 +3,12 @@ from typing import Any, Optional, Type
 from loguru import logger
 
 try:
-    from firecrawl import FirecrawlApp
-    FirecrawlApiClient: Type[FirecrawlApp] | None = FirecrawlApp
+    from firecrawl import Firecrawl
+    
+    FirecrawlApiClient: Type[Firecrawl] | None = Firecrawl
 except ImportError:
     FirecrawlApiClient = None
+    
     logger.error("Failed to import FirecrawlApp. Please ensure 'firecrawl-py' is installed.")
 
 
@@ -79,10 +81,10 @@ class FirecrawlApp(APIApplication):
 
             self._firecrawl_api_key = api_key
             logger.info(f"{self.name.capitalize()} API Key successfully retrieved and cached.")
+        assert self._firecrawl_api_key is not None
         return self._firecrawl_api_key
 
-    # Correct the return type hint to refer to the actual class name FirecrawlApp
-    def _get_client(self) -> FirecrawlApp:
+    def _get_client(self) -> Firecrawl:
         """
         Initializes and returns the Firecrawl client after ensuring API key is set.
         Raises NotAuthorizedError if API key cannot be obtained or SDK is not installed.
@@ -92,15 +94,13 @@ class FirecrawlApp(APIApplication):
             raise ToolError("Firecrawl SDK (firecrawl-py) is not installed or failed to import.")
 
         # The property self.firecrawl_api_key will raise NotAuthorizedError if key is missing/unretrievable
-        current_api_key = self.firecrawl_api_key
-        # Since FirecrawlApiClient is the class FirecrawlApp when imported,
-        # this correctly instantiates FirecrawlApp.
+        current_api_key = self.firecrawl_api_key        
         return FirecrawlApiClient(api_key=current_api_key)
 
-    def _handle_firecrawl_exception(self, e: Exception, operation_desc: str) -> str | None:
+    def _handle_firecrawl_exception(self, e: Exception, operation_desc: str) -> str:
         """
         Handles exceptions from Firecrawl operations, raising NotAuthorizedError for auth issues
-        and returning an error string or raising ToolError for other issues.
+        and returning an error string for other issues.
         This helper is designed to be used in tool methods.
         """
         logger.error(f"Firecrawl App: Error during {operation_desc}: {type(e).__name__} - {e}", exc_info=True)
@@ -110,8 +110,8 @@ class FirecrawlApp(APIApplication):
             "unauthorized" in error_str or
             "api key" in error_str or
             "authentication" in error_str or
-            (hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 401) or
-            (hasattr(e, 'status_code') and e.status_code == 401) # some SDKs might attach status_code directly
+            (hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 401) or  # type: ignore
+            (hasattr(e, 'status_code') and e.status_code == 401) # type: ignore
         )
         if is_auth_error:
             raise NotAuthorizedError(f"Firecrawl API authentication/authorization failed for {operation_desc}: {e}")
@@ -121,7 +121,7 @@ class FirecrawlApp(APIApplication):
 
     def scrape_url(
         self, url: str
-    ) -> dict[str, Any] | str:
+    ) -> Any:
         """
         Scrapes a single URL using Firecrawl and returns the extracted data.
 
@@ -142,7 +142,7 @@ class FirecrawlApp(APIApplication):
         logger.info(f"Attempting to scrape URL: {url}")
         try:
             client = self._get_client()
-            response_data = client.scrape_url(url=url)
+            response_data = client.scrape(url=url)
             logger.info(f"Successfully scraped URL: {url}")
             return response_data
         except NotAuthorizedError: 
@@ -150,7 +150,8 @@ class FirecrawlApp(APIApplication):
         except ToolError:
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"scraping URL {url}")
+            error_msg = self._handle_firecrawl_exception(e, f"scraping URL {url}")
+            return error_msg
 
     def search(
         self, query: str
@@ -177,13 +178,13 @@ class FirecrawlApp(APIApplication):
             client = self._get_client()
             response = client.search(query=query)
             logger.info(f"Successfully performed Firecrawl search for query: {query}")
-            return response
+            return response #type: ignore
         except NotAuthorizedError:
             raise
         except ToolError:
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"search for '{query}'")
+            return self._handle_firecrawl_exception(e, f"search for '{query}'")  
 
     def start_crawl(
         self,
@@ -209,18 +210,19 @@ class FirecrawlApp(APIApplication):
         logger.info(f"Attempting to start Firecrawl crawl for URL: {url}")
         try:
             client = self._get_client()
-            response = client.async_crawl_url(
+            response = client.start_crawl(
                 url=url,
+          
             )
             job_id = response.id
             logger.info(f"Successfully started Firecrawl crawl for URL {url}, Job ID: {job_id}")
-            return {"success": response.success, "id": response.id, "url": response.url}
+            return response  #type: ignore
         except NotAuthorizedError:
             raise
         except ToolError:
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"starting crawl for URL {url}")
+            return self._handle_firecrawl_exception(e, f"starting crawl for URL {url}")  # type: ignore
 
     def check_crawl_status(self, job_id: str) -> dict[str, Any] | str:
         """
@@ -243,15 +245,15 @@ class FirecrawlApp(APIApplication):
         logger.info(f"Attempting to check Firecrawl crawl status for job ID: {job_id}")
         try:
             client = self._get_client()
-            status = client.check_crawl_status(id=job_id) # Corrected: job_id parameter name
+            status = client.get_crawl_status(job_id=job_id)
             logger.info(f"Successfully checked Firecrawl crawl status for job ID: {job_id}")
-            return status
+            return status #type: ignore
         except NotAuthorizedError:
             raise
         except ToolError:
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"checking crawl status for job ID {job_id}")
+            return self._handle_firecrawl_exception(e, f"checking crawl status for job ID {job_id}")  # type: ignore
 
     def cancel_crawl(self, job_id: str) -> dict[str, Any] | str:
         """
@@ -275,15 +277,15 @@ class FirecrawlApp(APIApplication):
         logger.info(f"Attempting to cancel Firecrawl crawl job ID: {job_id}")
         try:
             client = self._get_client()
-            response = client.cancel_crawl(id=job_id)
+            response = client.cancel_crawl(crawl_id=job_id)
             logger.info(f"Successfully issued cancel command for Firecrawl crawl job ID: {job_id}")
-            return response
+            return response  #type: ignore
         except NotAuthorizedError:
             raise
         except ToolError:
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"cancelling crawl job ID {job_id}")
+            return self._handle_firecrawl_exception(e, f"cancelling crawl job ID {job_id}")  # type: ignore
 
     def start_batch_scrape(
         self,
@@ -309,15 +311,15 @@ class FirecrawlApp(APIApplication):
         logger.info(f"Attempting to start Firecrawl batch scrape for {len(urls)} URLs.")
         try:
             client = self._get_client()
-            response = client.async_batch_scrape_urls(urls=urls)
+            response = client.start_batch_scrape(urls=urls)
             logger.info(f"Successfully started Firecrawl batch scrape for {len(urls)} URLs.")
-            return response
+            return response  #type: ignore
         except NotAuthorizedError:
             raise
         except ToolError:
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"starting batch scrape for {len(urls)} URLs")
+            return self._handle_firecrawl_exception(e, f"starting batch scrape for {len(urls)} URLs")  # type: ignore
 
     def check_batch_scrape_status(self, job_id: str) -> dict[str, Any] | str:
         """
@@ -340,68 +342,16 @@ class FirecrawlApp(APIApplication):
         logger.info(f"Attempting to check Firecrawl batch scrape status for job ID: {job_id}")
         try:
             client = self._get_client()
-            status = client.check_batch_scrape_status(id=job_id)
+            status = client.get_batch_scrape_status(job_id=job_id)
             logger.info(f"Successfully checked Firecrawl batch scrape status for job ID: {job_id}")
-            return status
+            return status #type: ignore
         except NotAuthorizedError:
             raise
         except ToolError:
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"checking batch scrape status for job ID {job_id}")
+            return self._handle_firecrawl_exception(e, f"checking batch scrape status for job ID {job_id}")  # type: ignore
 
-    def start_extract(
-        self,
-        urls: list[str],
-        prompt: Optional[str] = None,
-        schema: Optional[Any] = None,
-        system_prompt: Optional[str] = None,
-        allow_external_links: Optional[bool] = False,
-    ) -> dict[str, Any] | str:
-        """
-        Starts an asynchronous extraction job for one or more URLs using Firecrawl.
-        Returns a job ID immediately that can be used to check status later.
-
-        Args:
-            urls: A list of URLs to extract data from.
-            prompt: Optional custom extraction prompt.
-            schema: Optional JSON schema or Pydantic model for the desired output structure.
-            system_prompt: Optional system context for the extraction.
-            allow_external_links: Optional boolean to allow following external links.
-
-        Returns:
-            A dictionary containing the job initiation response with job ID on success,
-            or a string containing an error message on failure.
-
-        Raises:
-            NotAuthorizedError: If API key is missing or invalid.
-            ToolError: If the Firecrawl SDK is not installed.
-
-        Tags:
-            extract, ai, async_job, start
-        """
-        logger.info(f"Attempting to start Firecrawl extraction for {len(urls)} URLs with prompt: {prompt is not None}, schema: {schema is not None}.")
-        try:
-            client = self._get_client()
-            response = client.async_extract(
-                urls=urls,
-                prompt=prompt,
-                schema=schema,
-                system_prompt=system_prompt,
-                allow_external_links=allow_external_links,
-            )
-            logger.info(f"Successfully started Firecrawl extraction for {len(urls)} URLs. Job ID: {response.job_id}")
-            return response.model_dump()
-        except NotAuthorizedError:
-            logger.error("Firecrawl API key missing or invalid.")
-            raise
-        except ToolError:
-            logger.error("Firecrawl SDK not installed.")
-            raise
-        except Exception as e:
-            error_message = self._handle_firecrawl_exception(e, f"starting extraction for {len(urls)} URLs")
-            logger.error(f"Failed to start Firecrawl extraction: {error_message}")
-            return error_message
 
     def quick_web_extract(
         self,
@@ -442,7 +392,7 @@ class FirecrawlApp(APIApplication):
                 allow_external_links=allow_external_links,
             )
             logger.info(f"Successfully completed quick web extraction for {len(urls)} URLs.")
-            return response
+            return response #type: ignore
         except NotAuthorizedError:
             logger.error("Firecrawl API key missing or invalid.")
             raise
@@ -480,13 +430,13 @@ class FirecrawlApp(APIApplication):
             client = self._get_client()
             status = client.get_extract_status(job_id=job_id)
             logger.info(f"Successfully checked Firecrawl extraction status for job ID: {job_id}")
-            return status
+            return status #type: ignore
         except NotAuthorizedError:
             raise
         except ToolError:
             raise
         except Exception as e:
-            return self._handle_firecrawl_exception(e, f"checking extraction status for job ID {job_id}")
+            return self._handle_firecrawl_exception(e, f"checking extraction status for job ID {job_id}")  # type: ignore
 
     def list_tools(self):
         return [
@@ -498,6 +448,5 @@ class FirecrawlApp(APIApplication):
             self.start_batch_scrape, 
             self.check_batch_scrape_status, 
             self.quick_web_extract,
-            self.start_extract, 
             self.check_extract_status, 
         ]

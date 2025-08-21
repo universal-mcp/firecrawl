@@ -10,9 +10,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [ "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.11", "License :: OSI Approved :: MIT License", "Operating System :: OS Independent",]
 dependencies = [
- "firecrawl-py>=2.4.3",
+ "firecrawl-py>=3.0.3",
  "langgraph>=0.6.5",
- "universal-mcp==0.1.22",
+ "universal-mcp==0.1.23",
 ]
 [[project.authors]]
 name = "Manoj Bajaj"
